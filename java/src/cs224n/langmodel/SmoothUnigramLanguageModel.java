@@ -18,6 +18,7 @@ public class EmpiricalUnigramLanguageModel implements LanguageModel {
   private static final String STOP = "</S>";
   
   private Counter<String> wordCounter;
+  private Vector<int> nkhistogram;
   private double total;
 
 
@@ -53,15 +54,32 @@ public class EmpiricalUnigramLanguageModel implements LanguageModel {
    */
   public void train(Collection<List<String>> sentences) {
     wordCounter = new Counter<String>();
+    nkhistogram[0] = 0;
+    int maxnk = 0;
     for (List<String> sentence : sentences) {
       List<String> stoppedSentence = new ArrayList<String>(sentence);
       stoppedSentence.add(STOP);
       for (String word : stoppedSentence) {
         wordCounter.incrementCount(word, 1.0);
+	int currCount = wordCounter.getCount(word);
+        if (currCount > maxnk){
+             maxnk = currCount;
+             nkhistogram[wordCounter.getCount(word)]= 0;
+	}
+	nkhistogram[wordCounter.getCount(word)]++;
+        nkhistogram[wordCounter.getCount(word)-1]--;
       }
     }
     total = wordCounter.totalCount();
+    adjustCounts();
   }
+
+    private void adjustCounts(){
+        for (nkhistogram.size()){
+             
+	}
+    }
+
 
 
   // -----------------------------------------------------------------------
