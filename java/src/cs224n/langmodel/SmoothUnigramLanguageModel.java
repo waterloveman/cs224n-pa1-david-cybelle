@@ -1,26 +1,24 @@
 package cs224n.langmodel;
 
 import cs224n.util.Counter;
-import cs224n.langmodel.SmoothedUnigramLanguageModel;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
 /**
- * A language model using smoothed bigram counts
+ * A dummy language model -- uses empirical unigram counts, plus a single
+ * ficticious count for unknown words.  (That is, we pretend that there is
+ * a single unknown word, and that we saw it just once during training.)
  *
- * @author Cybelle Smith
- * @author David Edwards
+ * @author Dan Klein
  */
-public class BigramLanguageModel implements LanguageModel {
+public class EmpiricalUnigramLanguageModel implements LanguageModel {
 
-  private static final String START = "<S>";
   private static final String STOP = "</S>";
   
   private Counter<String> wordCounter;
   private double total;
-  private SmoothedUnigramLanguageModel unigrams;
 
 
   // -----------------------------------------------------------------------
@@ -28,18 +26,18 @@ public class BigramLanguageModel implements LanguageModel {
   /**
    * Constructs a new, empty unigram language model.
    */
-  public BigramLanguageModel() {
+  public EmpiricalUnigramLanguageModel() {
     wordCounter = new Counter<String>();
     total = Double.NaN;
   }
 
   /**
-   * Constructs a bigram language model from a collection of sentences.  A
+   * Constructs a unigram language model from a collection of sentences.  A
    * special stop token is appended to each sentence, and then the
    * frequencies of all words (including the stop token) over the whole
    * collection of sentences are compiled.
    */
-  public BigramLanguageModel(Collection<List<String>> sentences) {
+  public EmpiricalUnigramLanguageModel(Collection<List<String>> sentences) {
     this();
     train(sentences);
   }
@@ -48,9 +46,9 @@ public class BigramLanguageModel implements LanguageModel {
   // -----------------------------------------------------------------------
 
   /**
-   * Constructs a bigram language model from a collection of sentences.  A
+   * Constructs a unigram language model from a collection of sentences.  A
    * special stop token is appended to each sentence, and then the
-   * frequencies of all bigrams (including the stop token) over the whole
+   * frequencies of all words (including the stop token) over the whole
    * collection of sentences are compiled.
    */
   public void train(Collection<List<String>> sentences) {
@@ -58,13 +56,10 @@ public class BigramLanguageModel implements LanguageModel {
     for (List<String> sentence : sentences) {
       List<String> stoppedSentence = new ArrayList<String>(sentence);
       stoppedSentence.add(STOP);
-      wordCounter.incrementCount(START+" "+stoppedSentence.get(0),1.0);
-      for (int i=0; i<stoppedSentence.size()-1; i++) {
-	wordCounter.incrementCount(stoppedSentence.get(i) + " " +
-				   stoppedSentence.get(i+1), 1.0);
+      for (String word : stoppedSentence) {
+        wordCounter.incrementCount(word, 1.0);
       }
     }
-    unigrams = SmoothedUnigramLanguageModel(sentences);
     total = wordCounter.totalCount();
   }
 
