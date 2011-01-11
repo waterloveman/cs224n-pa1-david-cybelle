@@ -1,6 +1,7 @@
 package cs224n.langmodel;
 
 import cs224n.util.Counter;
+import cs224n.langmodel.BigramLanguageModel;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -14,10 +15,12 @@ import java.util.List;
  */
 public class TrigramLanguageModel implements LanguageModel {
 
+  private static final String START = "<S>";
   private static final String STOP = "</S>";
   
   private Counter<String> wordCounter;
   private double total;
+  private BigramLanguageModel bigrams;
 
 
   // -----------------------------------------------------------------------
@@ -33,7 +36,7 @@ public class TrigramLanguageModel implements LanguageModel {
   /**
    * Constructs a bigram language model from a collection of sentences.  A
    * special stop token is appended to each sentence, and then the
-   * frequencies of all bigrams (including the stop token) over the whole
+   * frequencies of all words (including the stop token) over the whole
    * collection of sentences are compiled.
    */
   public TrigramLanguageModel(Collection<List<String>> sentences) {
@@ -53,15 +56,16 @@ public class TrigramLanguageModel implements LanguageModel {
   public void train(Collection<List<String>> sentences) {
     wordCounter = new Counter<String>();
     for (List<String> sentence : sentences) {
-      List<String> stopped = new ArrayList<String>(sentence);
-      stopped.add(STOP);
-      wordCounter.incrementCount("<S> " + stopped.getItem(0), 1.0);
-      for (int i = 0; i < stopped.getItemCount() - 2; i++) {
-	wordCounter.incrementCount(stopped.getItem(i)+
-				   " "+stopped.getItem(i+1) +
-				   " "+stopped.getItem(i+2), 1.0);
+      List<String> stoppedSentence = new ArrayList<String>(sentence);
+      stoppedSentence.add(STOP);
+      wordCounter.incrementCount(START+" "+stoppedSentence.get(0),1.0);
+      for (int i=0; i<stoppedSentence.size()-2; i++) {
+	wordCounter.incrementCount(stoppedSentence.get(i) + " " +
+				   stoppedSentence.get(i+1) + " " +
+				   stoppedSentence.get(i+2), 1.0);
       }
     }
+    bigrams = BigramLanguageModel(sentences);
     total = wordCounter.totalCount();
   }
 

@@ -21,7 +21,7 @@ public class LanguageModelTester {
    * is defined to be 2 to the power of the cross entropy, which in turn is
    * defined as the negative of the average (over the dataset) of the log
    * (base 2) of the probability, according to the model, of each datum.
-   * Lower perplexity indicates a better fit..
+   * Lower perplexity indicates a better fit.
    */
   static double computePerplexity(LanguageModel languageModel, 
                                   Collection<List<String>> sentences) {
