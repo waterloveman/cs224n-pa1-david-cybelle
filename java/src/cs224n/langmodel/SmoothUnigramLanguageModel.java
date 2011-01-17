@@ -5,7 +5,8 @@ import cs224n.util.Counter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.lang.Math;
+import java.util.Vector;
+import java.lang.Math.*;
 import java.lang.Integer;
 
 /**
@@ -20,9 +21,10 @@ public class SmoothUnigramLanguageModel implements LanguageModel {
 	private static final String STOP = "</S>";
 	
 	private Counter<String> wordCounter;
-	private Vector<int> nkhistogram;
+	private Vector nkhistogram;
+	private Vector unigramLogProbability;
 	private double total;
-	private double total_UNK_prob
+
 	
 	
 	// -----------------------------------------------------------------------
@@ -30,7 +32,7 @@ public class SmoothUnigramLanguageModel implements LanguageModel {
 	/**
 	 * Constructs a new, empty unigram language model.
 	 */
-	public EmpiricalUnigramLanguageModel() {
+	public SmoothUnigramLanguageModel() {
 		wordCounter = new Counter<String>();
 		total = Double.NaN;
 	}
@@ -41,7 +43,7 @@ public class SmoothUnigramLanguageModel implements LanguageModel {
 	 * frequencies of all words (including the stop token) over the whole
 	 * collection of sentences are compiled.
 	 */
-	public EmpiricalUnigramLanguageModel(Collection<List<String>> sentences) {
+	public SmoothUnigramLanguageModel(Collection<List<String>> sentences) {
 		this();
 		train(sentences);
 	}
@@ -57,20 +59,22 @@ public class SmoothUnigramLanguageModel implements LanguageModel {
 	 */
 	public void train(Collection<List<String>> sentences) {
 		wordCounter = new Counter<String>();
-		nkhistogram.set(0,0);
-		int maxnk = 0;
+		nkhistogram.set(0,(double)0.0);
+		double maxnk = 0.0;
+	    double nk;
 		for (List<String> sentence : sentences) {
 			List<String> stoppedSentence = new ArrayList<String>(sentence);
 			stoppedSentence.add(STOP);
 			for (String word : stoppedSentence) {
 				wordCounter.incrementCount(word, 1.0);
-				int currCount = wordCounter.getCount(word);
+				int currCount = (int) wordCounter.getCount(word);
 				if (currCount > maxnk){
-					maxnk = currCount;
-					nkhistogram.set(currCount,0);
+					maxnk = (double) currCount;
+					nkhistogram.set(currCount,(double) 0.0);
 				}
-				nkhistogram.set(currCount,++nkhistogram.get(currCount));
-				nkhistogram.set(currCount-1,--nkhistogram.get(currCount));
+				nk = ((Double) nkhistogram.get(currCount)).doubleValue();
+				nkhistogram.set(currCount,(nk + 1.0));
+				nkhistogram.set(currCount-1,(nk - 1.0));
 			}
 		}
 		total = wordCounter.totalCount();
@@ -81,17 +85,18 @@ public class SmoothUnigramLanguageModel implements LanguageModel {
 	 * Follow the procedure in Gale and Sampson 1995, Good-Turing Frequency Estimation without Tears, to calculate the adjusted unigram frequency counts.
 	 */
     private void adjustCounts(){
-		Vector<double> Z;
-		Vector<double> logR;
-		Vector<double> logZ;
-		Vector<double> r_star;
+		Vector Z = new Vector();
+		Vector logR = new Vector();
+		Vector logZ = new Vector();
+		Vector r_star = new Vector();
 		double Zvalue;
 		double i;
 		double k;
-		double a;
-		double b;
+		double a = 0.0;
+		double b = 0.0;
 		double x;
 		double y;
+		double N_dash = 0.0;
 		
         for (int j = 1; j < nkhistogram.size(); j++){
 			if (j == 1){
@@ -100,37 +105,43 @@ public class SmoothUnigramLanguageModel implements LanguageModel {
 				i = j -1;
 			}
 			if (j==(nkhistogram.size() - 1)){
-				k = 2j - i;
+				k = (2*j - i);
 			} else {
 				k = j + 1;
 			}
-			Zvalue = (2*nkhistogram.get(j))/(k-i);
+			Zvalue = (2*((Double) nkhistogram.get(j)).doubleValue())/(k-i);
 			Z.set(j,Zvalue);
 		}
 		getLogarithms(nkhistogram.size()-1,logR);
 		getLogarithms(Z,logR);
 		setLeastSquaresParameters(a,b,logR,logZ);
+	
 		for (int r = 1; r < nkhistogram.size(); r++){
-			x = (r + 1) * (nkhistogram.get(r + 1)/nkhistogram.get(r));
+			x = (r + 1) * (((Double) nkhistogram.get(r + 1)).doubleValue()/((Double) nkhistogram.get(r)).doubleValue());
 			y = (r + 1) * (S(a, b, r + 1) / S(a, b, r));
 			if (useXnotY(x, y, r)){
 				r_star.set(r, x);
 			} else {
 				r_star.set(r, y);
 			}
+			N_dash = N_dash + ((Double) nkhistogram.get(r)).doubleValue() * ((Double) r_star.get(r)).doubleValue();
+		}
+		unigramLogProbability.set(0, ((Double) nkhistogram.get(1)).doubleValue()/total);
+		for (int r = 1; r < nkhistogram.size(); r++){
+			unigramLogProbability.set(r, (1-(((Double) nkhistogram.get(1)).doubleValue()/total))*(((Double) r_star.get(r)).doubleValue()/N_dash));
 		}
     }
 	
-    private void getLogarithms(int nRows, Vector<double> logs){
+    private void getLogarithms(int nRows, Vector logs){
 		for (int  i = 1; i < nRows+1; i++){
-			logs.set(i,log(i.doubleValue()));
+			logs.set(i,java.lang.Math.log((double) i));
 		}
     }
 	
-    private void getLogarithms(Vector<double> tobeLogged, Vector<double>
+    private void getLogarithms(Vector tobeLogged, Vector
 							   logs){
 		for (int i = 1; i < tobeLogged.size(); i++){
-			logs.set(i,log((tobeLogged.get(i)).doubleValue()));
+			logs.set(i,java.lang.Math.log(((Double) tobeLogged.get(i)).doubleValue()));
 		}
     }
 	
@@ -139,43 +150,43 @@ public class SmoothUnigramLanguageModel implements LanguageModel {
 	 * to the pairs of values in the logR and logZ vectors.
 	 */
     private void setLeastSquaresParameters(double a, double b,
-					   Vector<double> logR,
-					   Vector<double> logZ){
+					   Vector logR,
+					   Vector logZ){
 		double logR_Mean = getMean(logR);
 		double logZ_Mean = getMean(logZ);
 		double b_numerator = 0;
 		double b_denominator = 0;
 		for (int row = 1; row < logR.size(); row++){
-			b_numerator += (logR.get(row) -	logR_Mean)*(logZ.get(row) - 
+			b_numerator = b_numerator + (((Double) logR.get(row)).doubleValue() -	logR_Mean)*(((Double) logZ.get(row)).doubleValue() - 
 								    logZ_Mean);
-			b_denominator += pow((logR.get(row) - logR_Mean),2.0);
+			b_denominator = b_denominator + java.lang.Math.pow((((Double) logR.get(row)).doubleValue() - logR_Mean),2.0);
 		}
 		b = b_numerator / b_denominator;
 		a = logZ_Mean - (b * logR_Mean);
     }
 	
-    private double getMean(Vector<double> values){
+    private double getMean(Vector values){
 		// since the zeroith index  doesn't count for our purposes
 		double n_values = values.size() - 1;
-		double total;
+		double sum = 0.0;
 		double mean;
 		for (int i = 1; i < values.size(); i++){
-			total += values.get(i);
+			sum = sum + ((Double) values.get(i)).doubleValue();
 		}
-		mean = total / n_values;
+		mean = sum / n_values;
 		return mean;
     }
 	
     private double S(double a, double b, int  r){
-		return exp(a + (b * log(r)));
+		return java.lang.Math.exp(a + (b * java.lang.Math.log((double) r)));
     }
 	
     private boolean useXnotY(double x, double y, int r){
-		double n_rplusone = (double) nkhistogram.get(r+1);
-		double n_r = (double) nkhistogram.get(r);
+		double n_rplusone = ((Double) nkhistogram.get(r+1)).doubleValue();
+		double n_r = ((Double) nkhistogram.get(r)).doubleValue();
 		double rplusone = (double) (r + 1);
-		double crazyEquation = 1.96 * sqrt( pow(rplusone, 2)*(n_rplusone/pow(n_r,2))*(1 + (n_rplusone/ n_r);
-		if (abs(x - y)>(crazyEquation)){
+		double crazyEquation = 1.96 * java.lang.Math.sqrt(java.lang.Math.pow(rplusone, 2)*(n_rplusone/java.lang.Math.pow(n_r,2))*(1 + (n_rplusone/ n_r)));
+		if (java.lang.Math.abs(x - y)> crazyEquation ){
 			return true;
 		} else {
 			return false;
@@ -185,12 +196,9 @@ public class SmoothUnigramLanguageModel implements LanguageModel {
 							 
 // -----------------------------------------------------------------------
 							 
-private double getWordProbability(String word) { double count = wordCounter.getCount(word);
-	 if (count == 0) {                   // unknown word
-					    // System.out.println("UNKNOWN WORD: " + sentence.get(index));
-	     return 1.0 / (total + 1.0);
-	 }
-	 return count / (total + 1.0);
+private double getWordProbability(String word) { 
+	 int count = (int) wordCounter.getCount(word);
+	 return ((Double) unigramLogProbability.get(count)).doubleValue();
 }
 							 
 							 /**
@@ -212,9 +220,9 @@ private double getWordProbability(String word) { double count = wordCounter.getC
 							 public double getSentenceProbability(List<String> sentence) {
 								 List<String> stoppedSentence = new ArrayList<String>(sentence);
 								 stoppedSentence.add(STOP);
-								 double probability = 1.0;
+								 double probability = 0.0;
 								 for (int index = 0; index < stoppedSentence.size(); index++) {
-									 probability *= getWordProbability(stoppedSentence, index);
+									 probability += getWordProbability(stoppedSentence, index);
 								 }
 								 return probability;
 							 }
@@ -230,13 +238,13 @@ private double getWordProbability(String word) { double count = wordCounter.getC
 								 
 								 // this loop goes through the vocabulary (which includes STOP)
 								 for (String word : wordCounter.keySet()) {
-									 sum += getWordProbability(word);
+									 sum = sum + getWordProbability(word);
 								 }
 								 
 								 // remember to add the UNK. In this EmpiricalUnigramLanguageModel
-								 // we assume there is only one UNK, so we add...
-								 sum += 1.0 / (total + 1.0);
-								 
+								 sum = sum + ((Double) unigramLogProbability.get(0)).doubleValue();
+								 sum = java.lang.Math.exp(sum);
+						
 								 return sum;
 							 }
 							 
@@ -250,7 +258,7 @@ private double getWordProbability(String word) { double count = wordCounter.getC
 								 double sample = Math.random();
 								 double sum = 0.0;
 								 for (String word : wordCounter.keySet()) {
-									 sum += wordCounter.getCount(word) / total;
+									 sum += getWordProbability(word);
 									 if (sum > sample) {
 										 return word;
 									 }
@@ -272,4 +280,4 @@ private double getWordProbability(String word) { double count = wordCounter.getC
 								 return sentence;
 							 }
 							 
-							 }
+					}

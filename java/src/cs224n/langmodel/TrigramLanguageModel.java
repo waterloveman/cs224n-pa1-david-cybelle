@@ -65,7 +65,7 @@ public class TrigramLanguageModel implements LanguageModel {
 				   stoppedSentence.get(i+2), 1.0);
       }
     }
-    bigrams = BigramLanguageModel(sentences);
+    bigrams =  new BigramLanguageModel(sentences);
     total = wordCounter.totalCount();
   }
 
