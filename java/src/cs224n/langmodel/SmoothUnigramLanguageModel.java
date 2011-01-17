@@ -34,6 +34,8 @@ public class SmoothUnigramLanguageModel implements LanguageModel {
 	 */
 	public SmoothUnigramLanguageModel() {
 		wordCounter = new Counter<String>();
+		nkhistogram = new Vector();
+		unigramLogProbability = new Vector();
 		total = Double.NaN;
 	}
 	
@@ -59,7 +61,7 @@ public class SmoothUnigramLanguageModel implements LanguageModel {
 	 */
 	public void train(Collection<List<String>> sentences) {
 		wordCounter = new Counter<String>();
-		nkhistogram.set(0,(double)0.0);
+		nkhistogram.add(0.0);
 		double maxnk = 0.0;
 	    double nk;
 		for (List<String> sentence : sentences) {
@@ -68,9 +70,9 @@ public class SmoothUnigramLanguageModel implements LanguageModel {
 			for (String word : stoppedSentence) {
 				wordCounter.incrementCount(word, 1.0);
 				int currCount = (int) wordCounter.getCount(word);
-				if (currCount > maxnk){
+				if (currCount > (maxnk - 1.0)){
 					maxnk = (double) currCount;
-					nkhistogram.set(currCount,(double) 0.0);
+					nkhistogram.add(0.0);
 				}
 				nk = ((Double) nkhistogram.get(currCount)).doubleValue();
 				nkhistogram.set(currCount,(nk + 1.0));
@@ -86,9 +88,13 @@ public class SmoothUnigramLanguageModel implements LanguageModel {
 	 */
     private void adjustCounts(){
 		Vector Z = new Vector();
+		Z.add(0.0);
 		Vector logR = new Vector();
+		logR.add(0.0);
 		Vector logZ = new Vector();
+		logZ.add(0.0);
 		Vector r_star = new Vector();
+		r_star.add(0.0);
 		double Zvalue;
 		double i;
 		double k;
@@ -110,6 +116,10 @@ public class SmoothUnigramLanguageModel implements LanguageModel {
 				k = j + 1;
 			}
 			Zvalue = (2*((Double) nkhistogram.get(j)).doubleValue())/(k-i);
+			Z.add(0.0);
+			logR.add(0.0);
+			logZ.add(0.0);
+			r_star.add(0,0);
 			Z.set(j,Zvalue);
 		}
 		getLogarithms(nkhistogram.size()-1,logR);
@@ -117,15 +127,20 @@ public class SmoothUnigramLanguageModel implements LanguageModel {
 		setLeastSquaresParameters(a,b,logR,logZ);
 	
 		for (int r = 1; r < nkhistogram.size(); r++){
-			x = (r + 1) * (((Double) nkhistogram.get(r + 1)).doubleValue()/((Double) nkhistogram.get(r)).doubleValue());
 			y = (r + 1) * (S(a, b, r + 1) / S(a, b, r));
-			if (useXnotY(x, y, r)){
-				r_star.set(r, x);
+			if (r < nkhistogram.size() - 1){
+				x = (r + 1) * (((Double) nkhistogram.get(r + 1)).doubleValue()/((Double) nkhistogram.get(r)).doubleValue());
+				if (useXnotY(x, y, r)){
+					r_star.set(r, x);
+				} else {
+					r_star.set(r, y);
+				}
 			} else {
 				r_star.set(r, y);
 			}
 			N_dash = N_dash + ((Double) nkhistogram.get(r)).doubleValue() * ((Double) r_star.get(r)).doubleValue();
 		}
+		unigramLogProbability.setSize(nkhistogram.size());
 		unigramLogProbability.set(0, ((Double) nkhistogram.get(1)).doubleValue()/total);
 		for (int r = 1; r < nkhistogram.size(); r++){
 			unigramLogProbability.set(r, (1-(((Double) nkhistogram.get(1)).doubleValue()/total))*(((Double) r_star.get(r)).doubleValue()/N_dash));
