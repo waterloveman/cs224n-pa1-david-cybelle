@@ -1,7 +1,7 @@
 package cs224n.langmodel;
 
 import cs224n.util.Counter;
-import cs224n.langmodel.SmoothedUnigramLanguageModel;
+import cs224n.langmodel.SmoothUnigramLanguageModel;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -20,7 +20,7 @@ public class BigramLanguageModel implements LanguageModel {
   
   private Counter<String> wordCounter;
   private double total;
-  private SmoothedUnigramLanguageModel unigrams;
+  private SmoothUnigramLanguageModel unigrams;
 
 
   // -----------------------------------------------------------------------
@@ -64,7 +64,7 @@ public class BigramLanguageModel implements LanguageModel {
 				   stoppedSentence.get(i+1), 1.0);
       }
     }
-    unigrams = SmoothedUnigramLanguageModel(sentences);
+    unigrams = new SmoothUnigramLanguageModel(sentences);
     total = wordCounter.totalCount();
   }
 
