@@ -6,8 +6,10 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Vector;
+import java.util.Random;
 import java.lang.Math.*;
 import java.lang.Integer;
+
 
 /**
  * A dummy language model -- uses empirical unigram counts, plus a single
@@ -248,7 +250,7 @@ private double getWordProbability(String word) {
 								 for (int index = 0; index < stoppedSentence.size(); index++) {
 									 probability = probability + getWordProbability(stoppedSentence, index);
 								 }
-								 return (Math.exp(-probability));
+								 return (probability);
 							 }
 							 
 							 /**
@@ -298,7 +300,7 @@ private double getWordProbability(String word) {
 								 double sample = Math.random();
 								 double sum = 0.0;
 								 for (String word : wordCounter.keySet()) {
-									 sum = sum - java.lang.Math.exp(getWordProbability(word));
+									 sum = sum + Math.exp(-getWordProbability(word));
 									 if (sum > sample) {
 										 return word;
 									 }
@@ -313,10 +315,12 @@ private double getWordProbability(String word) {
 							 public List<String> generateSentence() {
 								 List<String> sentence = new ArrayList<String>();
 								 String word = generateWord();
-								 while (!word.equals(STOP)) {
+								 //while (!word.equals(STOP)) {
+								 for (int i = 0; i < 10; i++){
 									 sentence.add(word);
 									 word = generateWord();
 								 }
+								 //}
 								 return sentence;
 							 }
 							 
