@@ -18,6 +18,7 @@ import java.lang.Integer;
  */
 public class SmoothUnigramLanguageModel implements LanguageModel {
 	
+	
 	private static final String STOP = "</S>";
 	
 	private Counter<String> wordCounter;
@@ -61,25 +62,31 @@ public class SmoothUnigramLanguageModel implements LanguageModel {
 	 */
 	public void train(Collection<List<String>> sentences) {
 		wordCounter = new Counter<String>();
-		nkhistogram.add(0.0);
-		double maxnk = 0.0;
-	    double nk;
+		
 		for (List<String> sentence : sentences) {
 			List<String> stoppedSentence = new ArrayList<String>(sentence);
 			stoppedSentence.add(STOP);
 			for (String word : stoppedSentence) {
 				wordCounter.incrementCount(word, 1.0);
-				int currCount = (int) wordCounter.getCount(word);
-				if (currCount > (maxnk - 1.0)){
-					maxnk = (double) currCount;
-					nkhistogram.add(0.0);
-				}
-				nk = ((Double) nkhistogram.get(currCount)).doubleValue();
-				nkhistogram.set(currCount,(nk + 1.0));
-				nkhistogram.set(currCount-1,(nk - 1.0));
 			}
 		}
 		total = wordCounter.totalCount();
+		double wordCount;
+		double nWordsWithCurrNK;
+		nkhistogram.add(0.0);
+		for (String word : wordCounter.keySet()) {
+			wordCount = wordCounter.getCount(word);
+			//System.out.println(word + "     " + wordCount);
+			while (wordCount > nkhistogram.size() - 1){
+				nkhistogram.add(0.0);
+			}
+			nWordsWithCurrNK = ((Double) nkhistogram.get((int) wordCount)).doubleValue() + 1.0;
+			nkhistogram.set((int) wordCount,  nWordsWithCurrNK);
+		}
+		/*for (int i = 0; i < nkhistogram.size(); i++){
+			System.out.println("number of words with count " + i + " is: " + nkhistogram.get(i));
+		}*/
+		
 		adjustCounts();
 	}
 	
@@ -122,7 +129,7 @@ public class SmoothUnigramLanguageModel implements LanguageModel {
 			r_star.add(0,0);
 			Z.set(j,Zvalue);
 		}
-		getLogarithms(nkhistogram.size()-1,logR);
+		getLogarithms(logR);
 		getLogarithms(Z,logR);
 		setLeastSquaresParameters(a,b,logR,logZ);
 	
@@ -141,14 +148,17 @@ public class SmoothUnigramLanguageModel implements LanguageModel {
 			N_dash = N_dash + ((Double) nkhistogram.get(r)).doubleValue() * ((Double) r_star.get(r)).doubleValue();
 		}
 		unigramLogProbability.setSize(nkhistogram.size());
-		unigramLogProbability.set(0, ((Double) nkhistogram.get(1)).doubleValue()/total);
+		System.out.println("Number of words with count 1: " + nkhistogram.get(1));
+		unigramLogProbability.set(0, -Math.log((((Double) nkhistogram.get(1)).doubleValue()/(total))));
+		System.out.println("UNK probability: " + Math.exp(-((Double)unigramLogProbability.get(0)).doubleValue()));
 		for (int r = 1; r < nkhistogram.size(); r++){
-			unigramLogProbability.set(r, (1-(((Double) nkhistogram.get(1)).doubleValue()/total))*(((Double) r_star.get(r)).doubleValue()/N_dash));
+			unigramLogProbability.set(r, -Math.log((1-(((Double) nkhistogram.get(1)).doubleValue()/total))*(((Double) r_star.get(r)).doubleValue()/N_dash)));
+			//System.out.println("ulp of words with count " + r + " is: " + unigramLogProbability.get(r));
 		}
     }
 	
-    private void getLogarithms(int nRows, Vector logs){
-		for (int  i = 1; i < nRows+1; i++){
+    private void getLogarithms(Vector logs){
+		for (int  i = 1; i < nkhistogram.size(); i++){
 			logs.set(i,java.lang.Math.log((double) i));
 		}
     }
@@ -182,13 +192,12 @@ public class SmoothUnigramLanguageModel implements LanguageModel {
 	
     private double getMean(Vector values){
 		// since the zeroith index  doesn't count for our purposes
-		double n_values = values.size() - 1;
 		double sum = 0.0;
 		double mean;
 		for (int i = 1; i < values.size(); i++){
 			sum = sum + ((Double) values.get(i)).doubleValue();
 		}
-		mean = sum / n_values;
+		mean = sum / wordCounter.size();
 		return mean;
     }
 	
@@ -237,9 +246,9 @@ private double getWordProbability(String word) {
 								 stoppedSentence.add(STOP);
 								 double probability = 0.0;
 								 for (int index = 0; index < stoppedSentence.size(); index++) {
-									 probability += getWordProbability(stoppedSentence, index);
+									 probability = probability + getWordProbability(stoppedSentence, index);
 								 }
-								 return probability;
+								 return (Math.exp(-probability));
 							 }
 							 
 							 /**
@@ -247,20 +256,36 @@ private double getWordProbability(String word) {
 							  */
 							 public double checkModel() {
 								 double sum = 0.0;
+								 for (String word : wordCounter.keySet()) {
+									 sum = sum + Math.exp(-getWordProbability(word));
+								 }
+								 double unkProb = Math.exp(-((Double) unigramLogProbability.get(0)).doubleValue());
+								 sum = sum + unkProb;
+								 return sum;
+								 
+								 /*double sum = 0.0;
 								 // since this is a unigram model, 
 								 // the event space is everything in the vocabulary (including STOP)
 								 // and a UNK token
 								 
 								 // this loop goes through the vocabulary (which includes STOP)
+								 double numerator = 0.0;
+								 double wordProb;
 								 for (String word : wordCounter.keySet()) {
-									 sum = sum + getWordProbability(word);
+									 wordProb = getWordProbability(word);
+									 sum = sum + wordProb;
+									 numerator += Math.exp(wordProb);
 								 }
 								 
 								 // remember to add the UNK. In this EmpiricalUnigramLanguageModel
-								 sum = sum + ((Double) unigramLogProbability.get(0)).doubleValue();
-								 sum = java.lang.Math.exp(sum);
-						
-								 return sum;
+								 double unkProb = ((Double) unigramLogProbability.get(0)).doubleValue();
+								 sum = sum + unkProb;
+								 numerator += Math.exp(unkProb);
+								
+								 System.out.println("numerator in Check model: " + numerator);
+								 System.out.println("denominator in Check model: " + Math.exp(sum));
+								 double modelProb = (numerator / Math.exp(sum));
+								 return modelProb;*/
 							 }
 							 
 							 /**
@@ -273,7 +298,7 @@ private double getWordProbability(String word) {
 								 double sample = Math.random();
 								 double sum = 0.0;
 								 for (String word : wordCounter.keySet()) {
-									 sum += getWordProbability(word);
+									 sum = sum - java.lang.Math.exp(getWordProbability(word));
 									 if (sum > sample) {
 										 return word;
 									 }
