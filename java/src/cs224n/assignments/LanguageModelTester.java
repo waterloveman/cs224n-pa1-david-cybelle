@@ -27,17 +27,17 @@ public class LanguageModelTester {
                                   Collection<List<String>> sentences) {
     double logProbability = 0.0;
     double numSymbols = 0.0;
-    for (List<String> sentence : sentences) { 		
-    		logProbability += 
-    			(-languageModel.getSentenceProbability(sentence)) / 
-    			Math.log(2.0);
+    for (List<String> sentence : sentences) {
+      logProbability += 
+        Math.log(languageModel.getSentenceProbability(sentence)) / 
+        Math.log(2.0);
       numSymbols += sentence.size();
-      //System.out.println("logp=" + logProbability + " size=" + numSymbols);
+      //      System.out.println("logp=" + logProbability + " size=" + numSymbols);
     }
     double avgLogProbability = logProbability / numSymbols;
-    //System.out.println("avglogp=" + avgLogProbability);
+    //    System.out.println("avglogp=" + avgLogProbability);
     double perplexity = Math.pow(0.5, avgLogProbability);
-    //System.out.println("perplexity=" + perplexity);
+    //    System.out.println("perplexity=" + perplexity);
     return perplexity;
   }
 
@@ -73,7 +73,7 @@ public class LanguageModelTester {
       double numWithBestScores = 0.0;
       double distanceForBestScores = 0.0;
       for (List<String> guess : jProblem.getNBestSentences()) {
-        double score = -languageModel.getSentenceProbability(guess);
+        double score = languageModel.getSentenceProbability(guess);
         double distance = editDistance.getDistance(correctSentence, guess);
         if (score == bestScore) {
           numWithBestScores += 1.0;
