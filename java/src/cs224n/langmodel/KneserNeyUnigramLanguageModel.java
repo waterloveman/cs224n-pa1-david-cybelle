@@ -100,11 +100,18 @@ public class KneserNeyUnigramLanguageModel implements LanguageModel {
 	  
     double count = wordCounter.getCount(word);
 	if (!wordCounter.containsKey(word) || count == 0){              // unknown word
-		return (0.0 - (Math.log(delta * (V - NO)) - Math.log(NO * C)));
+		return getUnkProbability();
       // System.out.println("UNKNOWN WORD: " + sentence.get(index));
     }
     return (0.0 - (Math.log(count - delta) - Math.log(C)));
   }
+	
+	/*
+	 * Returns the minus log probability of UNK
+	 */
+	public double getUnkProbability(){
+		return (0.0 - (Math.log(delta * (V - NO)) - Math.log(NO * C)));
+	}
 
   /**
    * Returns the probability, according to the model, of the word specified
@@ -154,7 +161,7 @@ public class KneserNeyUnigramLanguageModel implements LanguageModel {
 	  System.out.println("NO: " + NO);
 	  System.out.println("C: " + C);
 	  System.out.println("Minus Log UNK probability: " + -(Math.log(delta * (V - NO)) - Math.log(NO*C)));
-    sum += Math.exp(Math.log(delta * (V - NO)) - Math.log(NO*C));
+    sum += Math.exp(0.0 - getUnkProbability());
     
     return sum;
   }
