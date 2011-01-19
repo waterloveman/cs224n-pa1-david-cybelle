@@ -9,6 +9,7 @@ import java.util.Vector;
 import java.util.Random;
 import java.lang.Math.*;
 import java.lang.Integer;
+import java.lang.Double;
 
 
 /**
@@ -85,6 +86,7 @@ public class SmoothUnigramLanguageModel implements LanguageModel {
 			nWordsWithCurrNK = ((Double) nkhistogram.get((int) wordCount)).doubleValue() + 1.0;
 			nkhistogram.set((int) wordCount,  nWordsWithCurrNK);
 		}
+		System.out.println("number of words with count " + 165 + " is: " + nkhistogram.get(165));
 		/*for (int i = 0; i < nkhistogram.size(); i++){
 			System.out.println("number of words with count " + i + " is: " + nkhistogram.get(i));
 		}*/
@@ -97,13 +99,9 @@ public class SmoothUnigramLanguageModel implements LanguageModel {
 	 */
     private void adjustCounts(){
 		Vector Z = new Vector();
-		Z.add(0.0);
 		Vector logR = new Vector();
-		logR.add(0.0);
 		Vector logZ = new Vector();
-		logZ.add(0.0);
 		Vector r_star = new Vector();
-		r_star.add(0.0);
 		double Zvalue;
 		double i;
 		double k;
@@ -113,50 +111,78 @@ public class SmoothUnigramLanguageModel implements LanguageModel {
 		double y;
 		double N_dash = 0.0;
 		
-        for (int j = 1; j < nkhistogram.size(); j++){
-			if (j == 1){
-				i = 0;
-			} else {
-				i = j -1;
-			}
-			if (j==(nkhistogram.size() - 1)){
-				k = (2*j - i);
-			} else {
-				k = j + 1;
-			}
-			Zvalue = (2*((Double) nkhistogram.get(j)).doubleValue())/(k-i);
+		for (int rep = 0; rep < nkhistogram.size(); rep++){
 			Z.add(0.0);
 			logR.add(0.0);
 			logZ.add(0.0);
 			r_star.add(0,0);
-			Z.set(j,Zvalue);
+		}
+		
+        for (int j = 1; j < nkhistogram.size(); j++){
+        	if (((Double) nkhistogram.get(j)).doubleValue() != 0.0){
+        		if (j == 1){
+        			i = 0;
+        		} else {
+        			i = j -1;
+        		}
+        		if (j==(nkhistogram.size() - 1)){
+        			k = (2*j - i);
+        		} else {
+        			k = j + 1;
+        		}
+        		Zvalue = (2*((Double) nkhistogram.get(j)).doubleValue())/(k-i);
+        		Z.set(j,Zvalue);
+        	}
 		}
 		getLogarithms(logR);
 		getLogarithms(Z,logR);
 		setLeastSquaresParameters(a,b,logR,logZ);
 	
+		int rPlusOne;
 		for (int r = 1; r < nkhistogram.size(); r++){
-			y = (r + 1) * (S(a, b, r + 1) / S(a, b, r));
-			if (r < nkhistogram.size() - 1){
-				x = (r + 1) * (((Double) nkhistogram.get(r + 1)).doubleValue()/((Double) nkhistogram.get(r)).doubleValue());
-				if (useXnotY(x, y, r)){
-					r_star.set(r, x);
+			if (((Double) nkhistogram.get(r)).doubleValue() != 0.0){
+				rPlusOne = getNextR(r);
+				y = rPlusOne * (S(a, b, r + 1) / S(a, b, r));
+				if (rPlusOne < nkhistogram.size()){
+					x = rPlusOne * (((Double) nkhistogram.get(rPlusOne)).doubleValue()/((Double) nkhistogram.get(r)).doubleValue());
+					if (useXnotY(x, y, r)){
+						r_star.set(r, x);
+						System.out.println("X  r_star of row " + r + " is: " + x);
+					} else {
+						r_star.set(r, y);
+						System.out.println("Y  r_star of row " + r + " is: " + y);
+					}
 				} else {
 					r_star.set(r, y);
-				}
-			} else {
-				r_star.set(r, y);
+				}	
+				N_dash = N_dash + ((Double) nkhistogram.get(r)).doubleValue() * ((Double) r_star.get(r)).doubleValue();
 			}
-			N_dash = N_dash + ((Double) nkhistogram.get(r)).doubleValue() * ((Double) r_star.get(r)).doubleValue();
 		}
 		unigramLogProbability.setSize(nkhistogram.size());
 		System.out.println("Number of words with count 1: " + nkhistogram.get(1));
 		unigramLogProbability.set(0, -Math.log((((Double) nkhistogram.get(1)).doubleValue()/(total))));
 		System.out.println("UNK probability: " + Math.exp(-((Double)unigramLogProbability.get(0)).doubleValue()));
 		for (int r = 1; r < nkhistogram.size(); r++){
-			unigramLogProbability.set(r, -Math.log((1-(((Double) nkhistogram.get(1)).doubleValue()/total))*(((Double) r_star.get(r)).doubleValue()/N_dash)));
-			//System.out.println("ulp of words with count " + r + " is: " + unigramLogProbability.get(r));
+			if (((Double) nkhistogram.get(r)).doubleValue() != 0.0){
+				unigramLogProbability.set(r, -Math.log((1.0 -(((Double) nkhistogram.get(1)).doubleValue()/total))*(((Double) r_star.get(r)).doubleValue()/N_dash)));
+				System.out.println("ulp of words with count " + r + " is: " + unigramLogProbability.get(r));
+			}
 		}
+		/*double normalizedCountProb;
+		for (int r = 50; r < nkhistogram.size(); r++){
+		    normalizedCountProb = Math.log(((Double) nkhistogram.get(r)).doubleValue()) - Math.log(total + 1);
+		    unigramLogProbability.set(r, normalizedCountProb);
+		    System.out.println("ulp of words with count " + r + " is: " + unigramLogProbability.get(r));
+		}*/
+    }
+    
+    private int getNextR(int r){
+    	int j = r + 1;
+    	while (j < nkhistogram.size()){
+    		if (((Double) nkhistogram.get(r)).doubleValue() != 0.0) break;
+    		j++;
+    	}
+    	return j;
     }
 	
     private void getLogarithms(Vector logs){
@@ -208,9 +234,10 @@ public class SmoothUnigramLanguageModel implements LanguageModel {
     }
 	
     private boolean useXnotY(double x, double y, int r){
-		double n_rplusone = ((Double) nkhistogram.get(r+1)).doubleValue();
+    	int nextR = getNextR(r);
+		double n_rplusone = ((Double) nkhistogram.get(nextR)).doubleValue();
 		double n_r = ((Double) nkhistogram.get(r)).doubleValue();
-		double rplusone = (double) (r + 1);
+		double rplusone = (double) nextR;
 		double crazyEquation = 1.96 * java.lang.Math.sqrt(java.lang.Math.pow(rplusone, 2)*(n_rplusone/java.lang.Math.pow(n_r,2))*(1 + (n_rplusone/ n_r)));
 		if (java.lang.Math.abs(x - y)> crazyEquation ){
 			return true;
@@ -223,8 +250,21 @@ public class SmoothUnigramLanguageModel implements LanguageModel {
 // -----------------------------------------------------------------------
 							 
 private double getWordProbability(String word) { 
-	 int count = (int) wordCounter.getCount(word);
-	 return ((Double) unigramLogProbability.get(count)).doubleValue();
+	 int count;
+	 double logProb;
+	 double unkProb = ((Double) unigramLogProbability.get(0)).doubleValue();
+	 if (wordCounter.containsKey(word)){
+		 count = (int) wordCounter.getCount(word);
+		 logProb = ((Double) unigramLogProbability.get(count)).doubleValue();
+		 //System.out.println("returned -logProb " + logProb + " for word: " + word + " which has count " + wordCounter.getCount(word));
+		 if (logProb == java.lang.Double.POSITIVE_INFINITY){
+			 System.out.println("Error: word " + word + " has -logProb positive infinity");
+			 //return 13;
+		 } 
+		 return logProb;
+	 } else {
+		 return unkProb;
+	 }
 }
 							 
 							 /**
