@@ -1,0 +1,1 @@
+Implements unigram, bigram and trigram language model using Kneyser-Ney smoothing as described in Chen and Goodman 1998.
